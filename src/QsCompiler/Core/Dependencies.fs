@@ -5,6 +5,7 @@ namespace Microsoft.Quantum.QsCompiler
 
 open System.Collections.Immutable
 open Microsoft.Quantum.QsCompiler.DataTypes
+open Microsoft.Quantum.QsCompiler.ReservedKeywords
 open Microsoft.Quantum.QsCompiler.SyntaxTree
 
 
@@ -32,6 +33,14 @@ type BuiltIn = {
     /// Returns the set of namespaces that is automatically opened for each compilation.
     static member NamespacesToAutoOpen = ImmutableHashSet.Create (BuiltIn.CoreNamespace)
 
+    /// Returns the set of callables that rewrite steps take dependencies on.
+    /// These should be non-Generic callables only.
+    static member RewriteStepDependencies =
+        ImmutableHashSet.Create (
+            BuiltIn.RangeReverse.FullName,
+            BuiltIn.Length.FullName
+    )
+
     /// Returns true if the given attribute marks the corresponding declaration as entry point.
     static member MarksEntryPoint (att : QsDeclarationAttribute) = att.TypeId |> function
         | Value tId -> tId.Namespace.Value = BuiltIn.EntryPoint.FullName.Namespace.Value && tId.Name.Value = BuiltIn.EntryPoint.FullName.Name.Value
@@ -49,7 +58,12 @@ type BuiltIn = {
 
     /// Returns true if the given attribute defines an alternative name that may be used when loading a type or callable for testing purposes.
     static member internal DefinesNameForTesting (att : QsDeclarationAttribute) = att.TypeId |> function
-        | Value tId -> tId.Namespace.Value = BuiltIn.EnableTestingViaName.FullName.Namespace.Value && tId.Name.Value = BuiltIn.Test.FullName.Name.Value
+        | Value tId -> tId.Namespace.Value = BuiltIn.EnableTestingViaName.FullName.Namespace.Value && tId.Name.Value = BuiltIn.EnableTestingViaName.FullName.Name.Value
+        | Null -> false
+
+    /// Returns true if the given attribute indicates that the type or callable has been loaded via an alternative name for testing purposes.
+    static member internal DefinesLoadedViaTestNameInsteadOf (att : QsDeclarationAttribute) = att.TypeId |> function
+        | Value tId -> tId.Namespace.Value = GeneratedAttributes.Namespace && tId.Name.Value = GeneratedAttributes.LoadedViaTestNameInsteadOf
         | Null -> false
 
 
@@ -201,5 +215,5 @@ type BuiltIn = {
 
     static member IndexRange = {
         FullName = {Name = "IndexRange" |> NonNullable<string>.New; Namespace = BuiltIn.StandardArrayNamespace}
-        Kind = Function (TypeParameters = ImmutableArray.Empty)
+        Kind = Function (TypeParameters = ImmutableArray.Create("TElement" |> NonNullable<string>.New))
     }
