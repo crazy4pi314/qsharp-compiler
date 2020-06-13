@@ -17,7 +17,7 @@ namespace Microsoft.Quantum.Demos.CompilerExtensions.Demo
     /// The compilation step executes selective optimizations provided in the Microsoft.Quantum.QsCompiler.Experimental namespace.
     /// It adds a comment to each callable that lists all identifiers that were used within it prior to applying the optimizations.
     /// </summary>
-    public class CustomCompilerExtension : IRewriteStep
+    public class CustomCompilerExtension //: IRewriteStep
     {
         private readonly List<IRewriteStep.Diagnostic> Diagnostics;
 

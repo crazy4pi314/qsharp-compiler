@@ -1,12 +1,17 @@
 ﻿namespace Microsoft.Quantum.Demo {
     
-    function GetPair (n : Int) : (Int, Int) {
-        return (n, n+1);
-    }
-
+    /// # Summary
+    /// Entry point for the demo. 
+    ///
+    /// # Example
+    /// ```qsharp
+    /// function TestSampleProgram () : Unit {
+    ///     let output = Microsoft.Quantum.Demo.SampleProgram();
+    ///     Microsoft.Quantum.Diagnostics.FactI(0, output);
+    /// }
+    /// ```
     @EntryPoint()
-    operation SampleProgram () : Int {
-        let (a, b) = GetPair(5);
-        return a + b;
+    function SampleProgram () : Int {
+        return 0;
     }
 }
