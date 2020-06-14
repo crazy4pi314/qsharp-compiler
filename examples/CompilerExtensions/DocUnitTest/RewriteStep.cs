@@ -11,6 +11,7 @@ using Microsoft.Quantum.QsCompiler.DataTypes;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
 using Microsoft.Quantum.QsCompiler.Transformations.BasicTransformations;
 using VS = Microsoft.VisualStudio.LanguageServer.Protocol;
+using Constants = Microsoft.Quantum.QsCompiler.ReservedKeywords.AssemblyConstants;
 
 
 namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
@@ -71,14 +72,17 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
 
             var built = manager.Build();
             var diagnostics = built.Diagnostics();
-            //this.Diagnostics.AddRange(diagnostics.Select(d => IRewriteStep.Diagnostic.Create(d, IRewriteStep.Stage.Transformation)));
+            this.Diagnostics.AddRange(diagnostics.Select(d => IRewriteStep.Diagnostic.Create(d, IRewriteStep.Stage.Transformation)));
             if (diagnostics.Any(d => d.Severity == VS.DiagnosticSeverity.Error)) return false;
             if (!built.SyntaxTree.TryGetValue(NonNullable<string>.New(TestNamespaceName), out var testNs)) return false;
 
-            // Todo: we need to mark all elements in the newly created namespace with a suitable test attribute
+            // mark all callables in the newly created namespace as unit tests to run on the QuantumSimulator and ResourcesEstimator
 
+            static bool InTestNamespace(QsCallable c) => c.FullName.Namespace.Value == TestNamespaceName;
+            var qsimAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.QuantumSimulator));
+            var restAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.ResourcesEstimator));
             transformed = new QsCompilation(compilation.Namespaces.Add(testNs), compilation.EntryPoints);
-            transformed = TestAttribute.AddToCallables(transformed, c => c.SourceFile.Value == fileManager.FileName.Value);
+            transformed = Attributes.AddToCallables(transformed, (qsimAtt, InTestNamespace), (restAtt, InTestNamespace));
             return true;
         }
 

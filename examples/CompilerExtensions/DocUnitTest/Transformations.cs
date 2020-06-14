@@ -16,6 +16,7 @@ namespace Kaiser.Quantum.QsCompiler.Transformations
     using CallablePredicate = Func<QsCallable, bool>;
     using AttributeId = QsNullable<UserDefinedType>;
     using QsRangeInfo = QsNullable<Tuple<QsPositionInfo, QsPositionInfo>>;
+    using AttributeSelection = IEnumerable<(QsDeclarationAttribute, Func<QsCallable, bool>)>;
 
 
     public class ExamplesInDocs 
@@ -63,42 +64,50 @@ namespace Kaiser.Quantum.QsCompiler.Transformations
         }
     }
 
-    public class TestAttribute
-    : Core.SyntaxTreeTransformation<CallablePredicate>
+    public class Attributes
+    : Core.SyntaxTreeTransformation<AttributeSelection>
     {
-        private static readonly AttributeId TypeId =
-            AttributeId.NewValue(new UserDefinedType(BuiltIn.Test.FullName.Namespace, BuiltIn.Test.FullName.Name, QsRangeInfo.Null));
+        private readonly AttributeSelection AttributesToAdd;
 
-        private static TypedExpression Argument(string target) =>
+        private static AttributeId BuildId(QsQualifiedName name) =>
+            AttributeId.NewValue(new UserDefinedType(name.Namespace, name.Name, QsRangeInfo.Null));
+
+        public static QsDeclarationAttribute BuildAttribute(QsQualifiedName name, TypedExpression arg) =>
+            new QsDeclarationAttribute(BuildId(name), arg, null, QsComments.Empty); // FIXME: null
+
+        public static TypedExpression StringArgument(string target) =>
             SyntaxGenerator.StringLiteral(NonNullable<string>.New(target), ImmutableArray<TypedExpression>.Empty);
 
-        public static QsCompilation AddToCallables(
-            QsCompilation compilation, // AttributeId attributeId, TypedExpression attributeArg,
-            CallablePredicate predicate = null) =>
-                new TestAttribute(predicate).Apply(compilation);
+        public static QsCompilation AddToCallables(QsCompilation compilation, params (QsDeclarationAttribute, CallablePredicate)[] attributes) =>
+                new Attributes(attributes).Apply(compilation);
 
-        private TestAttribute(CallablePredicate predicate = null)
-        : base(predicate)
+        private Attributes(params (QsDeclarationAttribute, CallablePredicate)[] attributes)
+        : base(attributes)
         {
+            if (attributes == null || attributes.Any(entry => entry.Item1 == null)) throw new ArgumentNullException(nameof(attributes));
+            this.AttributesToAdd = attributes.ToImmutableArray();
+
             this.Namespaces = new NamespaceTransformation(this);
-            this.Statements = new Core.StatementTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
-            this.Expressions = new Core.ExpressionTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
-            this.Types = new Core.TypeTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
+            this.Statements = new Core.StatementTransformation<AttributeSelection>(this, Core.TransformationOptions.Disabled);
+            this.Expressions = new Core.ExpressionTransformation<AttributeSelection>(this, Core.TransformationOptions.Disabled);
+            this.Types = new Core.TypeTransformation<AttributeSelection>(this, Core.TransformationOptions.Disabled);
         }
 
         private class NamespaceTransformation
-        : Core.NamespaceTransformation<CallablePredicate>
+        : Core.NamespaceTransformation<AttributeSelection>
         {
-            public NamespaceTransformation(TestAttribute parent)
+            public NamespaceTransformation(Attributes parent)
             : base(parent)
             { }
 
             public override QsCallable OnCallableDeclaration(QsCallable c)
             {
-                if (!SharedState?.Invoke(c) ?? false) return c;
-                var qsimAtt = new QsDeclarationAttribute(TypeId, Argument("QuantumSimulator"), null, QsComments.Empty); // FIXME: null
-                var rsimAtt = new QsDeclarationAttribute(TypeId, Argument("ResourcesEstimator"), null, QsComments.Empty); // FIXME: null
-                return c.AddAttribute(qsimAtt).AddAttribute(rsimAtt);
+                var attributes = SharedState
+                    .Where(entry => entry.Item2?.Invoke(c) ?? true)
+                    .Select(entry => entry.Item1);                
+                foreach (var attribute in attributes)
+                    c = c.AddAttribute(attribute);
+                return c; 
             }
         }
     }
