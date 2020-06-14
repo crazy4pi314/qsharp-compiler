@@ -7,7 +7,7 @@
     /// ```qsharp
     /// function TestSampleProgram () : Unit {
     ///     let output = Microsoft.Quantum.Demo.SampleProgram();
-    ///     Microsoft.Quantum.Diagnostics.FactI(0, output);
+    ///     Microsoft.Quantum.Diagnostics.EqualityFactI(0, output, "wrong return value");
     /// }
     /// ```
     @EntryPoint()

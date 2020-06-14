@@ -7,52 +7,13 @@ using Microsoft.CodeAnalysis;
 using Microsoft.Quantum.QsCompiler;
 using Microsoft.Quantum.QsCompiler.CompilationBuilder;
 using Microsoft.Quantum.QsCompiler.DataTypes;
-using Microsoft.Quantum.QsCompiler.Documentation;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
 using Microsoft.Quantum.QsCompiler.Transformations.BasicTransformations;
-using Microsoft.Quantum.QsCompiler.Transformations.Core;
 
 
-namespace Kaiser.Quantum.CompilerExtensions
+namespace Kaiser.Quantum.CompileExtensions.DocToTest
 {
-    internal class ExamplesInDocs : SyntaxTreeTransformation<List<string>>
-    {
-        public ExamplesInDocs() : base(new List<string>(), TransformationOptions.NoRebuild)
-        {
-            this.Namespaces = new NamespaceTransformation(this);
-            this.Statements = new StatementTransformation<List<string>>(this, TransformationOptions.Disabled);
-        }
-
-        public static List<string> Extract(QsCompilation compilation)
-        {
-            var instance = new ExamplesInDocs();
-            instance.Apply(compilation);
-            return instance.SharedState;
-        }
-
-        private class NamespaceTransformation : NamespaceTransformation<List<string>>
-        {
-            public NamespaceTransformation(ExamplesInDocs parent) : base(parent, TransformationOptions.NoRebuild)
-            { }
-
-            public override ImmutableArray<string> OnDocumentation(ImmutableArray<string> doc)
-            {
-                var docComment = new DocComment(doc);
-                var examples = docComment.Example.Split('\r', '\n', StringSplitOptions.RemoveEmptyEntries);
-                while (examples.Any())
-                {
-                    var lines = examples
-                        .SkipWhile(line => !line.Trim().StartsWith("```"))
-                        .Skip(1)
-                        .TakeWhile(line => !line.Trim().StartsWith("```"));
-                    this.SharedState.Add(String.Join(Environment.NewLine, lines));
-                }
-                return doc;
-            }
-        }
-    }
-
-    public class DocsToTest : IRewriteStep
+    public class DocToTest : IRewriteStep
     {
         private readonly List<IRewriteStep.Diagnostic> Diagnostics;
         private const string TestNamespaceName = "Kaiser.Quantum.CompilerExtensions.DocsToTest";
@@ -71,7 +32,7 @@ namespace Kaiser.Quantum.CompilerExtensions
         public bool ImplementsTransformation => true;
         public bool ImplementsPostconditionVerification => false;
 
-        public DocsToTest()
+        public DocToTest()
         {
             this.AssemblyConstants = new Dictionary<string, string>();
             this.Diagnostics = new List<IRewriteStep.Diagnostic>();
@@ -79,14 +40,14 @@ namespace Kaiser.Quantum.CompilerExtensions
 
         public bool Transformation(QsCompilation compilation, out QsCompilation transformed)
         {
-            transformed = DocsToTest.FilterSourceFiles.Apply(compilation);
-            if (compilation.Namespaces.Any(ns => ns.Name.Value == DocsToTest.TestNamespaceName)) return false;
+            transformed = FilterSourceFiles.Apply(compilation);
+            if (compilation.Namespaces.Any(ns => ns.Name.Value == TestNamespaceName)) return false;
             var manager = new CompilationUnitManager();
 
             // get source code from examples
 
             var examples = ExamplesInDocs.Extract(transformed).Where(ex => !String.IsNullOrWhiteSpace(ex));
-            var (pre, post) = ($"namespace {DocsToTest.TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
+            var (pre, post) = ($"namespace {TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
             var sourceCode = pre + String.Join(Environment.NewLine, examples) + post + Environment.NewLine;
 
             var sourceName = NonNullable<string>.New(Path.GetFullPath("__GeneratedSourceForDocsToTest__.qs"));
@@ -97,14 +58,15 @@ namespace Kaiser.Quantum.CompilerExtensions
             // get everything contained in the compilation as references
 
             var refName = NonNullable<string>.New(Path.GetFullPath("__GeneratedReferencesForDocsToTest__"));
-            var refHeaders = new References.Headers(refName, compilation.Namespaces);
-            var refDict = new Dictionary<NonNullable<string>, References.Headers>();
-            refDict.Add(refName, refHeaders);
-            // todo: we need to change the line ending before building the references
+            var refHeaders = new References.Headers(refName, DllToQs.Rename(compilation).Namespaces);
+            var refDict = new Dictionary<NonNullable<string>, References.Headers>{{ refName, refHeaders }};
             var references = new References(refDict.ToImmutableDictionary());
             manager.UpdateReferencesAsync(references);
 
             var built = manager.Build();
+            var diagnostics = built.Diagnostics();
+            foreach (var d in diagnostics) Console.WriteLine(d.Message);
+
             if (built.Diagnostics().Any()) // todo: only for errors 
             {
                 this.Diagnostics.Add(new IRewriteStep.Diagnostic
@@ -116,10 +78,8 @@ namespace Kaiser.Quantum.CompilerExtensions
                 return false;
             }
 
-            if (!built.SyntaxTree.TryGetValue(NonNullable<string>.New(DocsToTest.TestNamespaceName), out var testNs)) return false;
+            if (!built.SyntaxTree.TryGetValue(NonNullable<string>.New(TestNamespaceName), out var testNs)) return false;
             transformed = new QsCompilation(compilation.Namespaces.Add(testNs), compilation.EntryPoints);
-
-            //transformed = built.BuiltCompilation;
             return true;
         }
 
