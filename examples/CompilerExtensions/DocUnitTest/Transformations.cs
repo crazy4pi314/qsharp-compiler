@@ -6,19 +6,21 @@ using System.Linq;
 using Microsoft.Quantum.QsCompiler.DataTypes;
 using Microsoft.Quantum.QsCompiler.Documentation;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
-using Microsoft.Quantum.QsCompiler.Transformations.Core;
+using Core = Microsoft.Quantum.QsCompiler.Transformations.Core;
 
 
-namespace Kaiser.Quantum.CompileExtensions.DocToTest
+namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
 {
-    internal class ExamplesInDocs : SyntaxTreeTransformation<List<string>>
+    internal class ExamplesInDocs 
+    : Core.SyntaxTreeTransformation<List<string>>
     {
-        public ExamplesInDocs() : base(new List<string>(), TransformationOptions.NoRebuild)
+        public ExamplesInDocs() 
+        : base(new List<string>(), Core.TransformationOptions.NoRebuild)
         {
             this.Namespaces = new NamespaceTransformation(this);
-            this.Statements = new StatementTransformation<List<string>>(this, TransformationOptions.Disabled);
-            this.Expressions = new ExpressionTransformation<List<string>>(this, TransformationOptions.Disabled);
-            this.Types = new TypeTransformation<List<string>>(this, TransformationOptions.Disabled);
+            this.Statements = new Core.StatementTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
+            this.Expressions = new Core.ExpressionTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
+            this.Types = new Core.TypeTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
         }
 
         public static List<string> Extract(QsCompilation compilation)
@@ -28,9 +30,11 @@ namespace Kaiser.Quantum.CompileExtensions.DocToTest
             return instance.SharedState;
         }
 
-        private class NamespaceTransformation : NamespaceTransformation<List<string>>
+        private class NamespaceTransformation 
+        : Core.NamespaceTransformation<List<string>>
         {
-            public NamespaceTransformation(ExamplesInDocs parent) : base(parent, TransformationOptions.NoRebuild)
+            public NamespaceTransformation(ExamplesInDocs parent) 
+            : base(parent, Core.TransformationOptions.NoRebuild)
             { }
 
             public override ImmutableArray<string> OnDocumentation(ImmutableArray<string> doc)
@@ -52,22 +56,25 @@ namespace Kaiser.Quantum.CompileExtensions.DocToTest
         }
     }
 
-    internal class DllToQs : SyntaxTreeTransformation
+    internal class DllToQs 
+    : Core.SyntaxTreeTransformation
     {
         private static readonly DllToQs Instance = new DllToQs();
         public static QsCompilation Rename(QsCompilation compilation) => Instance.Apply(compilation);
 
-        internal DllToQs() : base()
+        internal DllToQs() 
+        : base()
         {
-            this.Namespaces = new RenameSources(this);
-            this.Statements = new StatementTransformation(this, TransformationOptions.Disabled);
-            this.Expressions = new ExpressionTransformation(this, TransformationOptions.Disabled);
-            this.Types = new TypeTransformation(this, TransformationOptions.Disabled);
+            this.Namespaces = new NamespaceTransformation(this);
+            this.Statements = new Core.StatementTransformation(this, Core.TransformationOptions.Disabled);
+            this.Expressions = new Core.ExpressionTransformation(this, Core.TransformationOptions.Disabled);
+            this.Types = new Core.TypeTransformation(this, Core.TransformationOptions.Disabled);
         }
 
-        private class RenameSources : NamespaceTransformation
+        private class NamespaceTransformation : Core.NamespaceTransformation
         {
-            public RenameSources(DllToQs parent) : base(parent)
+            public NamespaceTransformation(DllToQs parent) 
+            : base(parent)
             { }
 
             public override NonNullable<string> OnSourceFile(NonNullable<string> f)

@@ -9,22 +9,29 @@ using Microsoft.Quantum.QsCompiler.CompilationBuilder;
 using Microsoft.Quantum.QsCompiler.DataTypes;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
 using Microsoft.Quantum.QsCompiler.Transformations.BasicTransformations;
+using VS = Microsoft.VisualStudio.LanguageServer.Protocol;
 
 
-namespace Kaiser.Quantum.CompileExtensions.DocToTest
+namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
 {
-    public class DocToTest : IRewriteStep
+    public class DocsToTests : IRewriteStep
     {
-        private readonly List<IRewriteStep.Diagnostic> Diagnostics;
-        private const string TestNamespaceName = "Kaiser.Quantum.CompilerExtensions.DocsToTest";
-        private static readonly FilterBySourceFile FilterSourceFiles = new FilterBySourceFile(source => source.Value.EndsWith(".qs"));
+        private const string TestNamespaceName = "Kaiser.Quantum.CompilerExtensions.DocsToTests";
+        private const string CodeSource = "__GeneratedSourceForDocsToTests__.g.qs";
+        private const string ReferenceSource = "__GeneratedReferencesForDocsToTests__.g.dll";
+
+        private readonly List<IRewriteStep.Diagnostic> Diagnostics =
+            new List<IRewriteStep.Diagnostic>();
+
+        private static readonly FilterBySourceFile FilterSourceFiles = 
+            new FilterBySourceFile(source => source.Value.EndsWith(".qs"));
 
         // interface properties
 
-        public string Name => "DocToTest";
+        public string Name => "DocsToTests";
         public int Priority => 0; // doesn't matter
 
-        public IDictionary<string, string> AssemblyConstants { get; }
+        public IDictionary<string, string> AssemblyConstants => null;
         public IEnumerable<IRewriteStep.Diagnostic> GeneratedDiagnostics =>
             this.Diagnostics;
 
@@ -32,11 +39,7 @@ namespace Kaiser.Quantum.CompileExtensions.DocToTest
         public bool ImplementsTransformation => true;
         public bool ImplementsPostconditionVerification => false;
 
-        public DocToTest()
-        {
-            this.AssemblyConstants = new Dictionary<string, string>();
-            this.Diagnostics = new List<IRewriteStep.Diagnostic>();
-        }
+        // interface methods
 
         public bool Transformation(QsCompilation compilation, out QsCompilation transformed)
         {
@@ -50,35 +53,29 @@ namespace Kaiser.Quantum.CompileExtensions.DocToTest
             var (pre, post) = ($"namespace {TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
             var sourceCode = pre + String.Join(Environment.NewLine, examples) + post + Environment.NewLine;
 
-            var sourceName = NonNullable<string>.New(Path.GetFullPath("__GeneratedSourceForDocsToTest__.qs"));
+            var sourceName = NonNullable<string>.New(Path.GetFullPath(CodeSource));
             if (!CompilationUnitManager.TryGetUri(sourceName, out var sourceUri)) return false;
             var fileManager = CompilationUnitManager.InitializeFileManager(sourceUri, sourceCode);
             manager.AddOrUpdateSourceFileAsync(fileManager);
 
             // get everything contained in the compilation as references
 
-            var refName = NonNullable<string>.New(Path.GetFullPath("__GeneratedReferencesForDocsToTest__"));
+            var refName = NonNullable<string>.New(Path.GetFullPath(ReferenceSource));
             var refHeaders = new References.Headers(refName, DllToQs.Rename(compilation).Namespaces);
             var refDict = new Dictionary<NonNullable<string>, References.Headers>{{ refName, refHeaders }};
             var references = new References(refDict.ToImmutableDictionary());
             manager.UpdateReferencesAsync(references);
 
+            // compile the examples in the doc comments and add any diagnostics to the list of generated diagnostics
+
             var built = manager.Build();
             var diagnostics = built.Diagnostics();
-            foreach (var d in diagnostics) Console.WriteLine(d.Message);
-
-            if (built.Diagnostics().Any()) // todo: only for errors 
-            {
-                this.Diagnostics.Add(new IRewriteStep.Diagnostic
-                {
-                    Severity = DiagnosticSeverity.Warning,
-                    Message = $"Error while compiling modification for {this.Name}",
-                    Stage = IRewriteStep.Stage.Transformation
-                });
-                return false;
-            }
-
+            //this.Diagnostics.AddRange(diagnostics.Select(d => IRewriteStep.Diagnostic.Create(d, IRewriteStep.Stage.Transformation)));
+            if (diagnostics.Any(d => d.Severity == VS.DiagnosticSeverity.Error)) return false;
             if (!built.SyntaxTree.TryGetValue(NonNullable<string>.New(TestNamespaceName), out var testNs)) return false;
+
+            // Todo: we need to mark all elements in the newly created namespace with a suitable test attribute
+
             transformed = new QsCompilation(compilation.Namespaces.Add(testNs), compilation.EntryPoints);
             return true;
         }
