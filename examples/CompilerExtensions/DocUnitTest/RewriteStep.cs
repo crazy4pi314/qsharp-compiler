@@ -19,7 +19,7 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
 {
     public class DocsToTests : IRewriteStep
     {
-        private const string TestNamespaceName = "Kaiser.Quantum.CompilerExtensions.DocsToTests";
+        private const string DefaultNamespaceName = "Kaiser.Quantum.CompilerExtensions.DocsToTests";
         private const string CodeSource = "__GeneratedSourceForDocsToTests__.g.qs";
         private const string ReferenceSource = "__GeneratedReferencesForDocsToTests__.g.dll";
 
@@ -40,15 +40,21 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         private static bool ContainsNamespace(QsCompilation compilation, string nsName) =>
             compilation.Namespaces.Any(ns => ns.Name.Value == nsName);
 
-        private string WrapInTestNamespace(IEnumerable<string> examples, QsCompilation compilation)
+        private FileContentManager InitializeFileManager(IEnumerable<string> examples, QsCompilation compilation, string nsName = null)
         {
-            var (pre, post) = ($"namespace {TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
+            var (pre, post) = ($"namespace {nsName ?? DefaultNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
             var openDirs = OpenedForTesting
                 .Where(nsName => ContainsNamespace(compilation, nsName))
-                .Select(nsName => $"open {nsName};");            
+                .Select(nsName => $"open {nsName};");
+
+            examples = examples.Where(ex => !String.IsNullOrWhiteSpace(ex));
             var content = String.Join(Environment.NewLine, openDirs.Concat(examples));
             var sourceCode = pre + content + post + Environment.NewLine;
-            return sourceCode;
+
+            var sourceName = NonNullable<string>.New(Path.GetFullPath($"{nsName}{CodeSource}"));
+            return CompilationUnitManager.TryGetUri(sourceName, out var sourceUri)
+                ? CompilationUnitManager.InitializeFileManager(sourceUri, sourceCode)
+                : null;
         }
 
         // interface properties
@@ -69,17 +75,16 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         public bool Transformation(QsCompilation compilation, out QsCompilation transformed)
         {
             transformed = FilterSourceFiles.Apply(compilation);
-            if (ContainsNamespace(compilation, TestNamespaceName)) return false;
             var manager = new CompilationUnitManager();
 
             // get source code from examples
 
-            var examples = ExamplesInDocs.Extract(transformed).Where(ex => !String.IsNullOrWhiteSpace(ex));
-            var sourceCode = WrapInTestNamespace(examples, compilation);
-            var sourceName = NonNullable<string>.New(Path.GetFullPath(CodeSource));
-            if (!CompilationUnitManager.TryGetUri(sourceName, out var sourceUri)) return false;
-            var fileManager = CompilationUnitManager.InitializeFileManager(sourceUri, sourceCode);
-            manager.AddOrUpdateSourceFileAsync(fileManager);
+            var fileManagers = ExamplesInDocs.Extract(transformed)
+                .Select(g => InitializeFileManager(g, compilation, g.Key))
+                .Where(m => m != null).ToImmutableHashSet();
+            manager.AddOrUpdateSourceFilesAsync(fileManagers, suppressVerification: true);
+            var sourceFiles = fileManagers.Select(m => m.FileName).ToImmutableHashSet();
+            bool IsGeneratedSourceFile(NonNullable<string> source) => sourceFiles.Contains(source);
 
             // get everything contained in the compilation as references
 
@@ -95,18 +100,27 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
             var diagnostics = built.Diagnostics();
             this.Diagnostics.AddRange(diagnostics.Select(d => IRewriteStep.Diagnostic.Create(d, IRewriteStep.Stage.Transformation)));
             if (diagnostics.Any(d => d.Severity == VS.DiagnosticSeverity.Error)) return false;
-            if (!built.SyntaxTree.TryGetValue(NonNullable<string>.New(TestNamespaceName), out var testNs)) return false;
 
-            // mark all callables in the newly created namespace as unit tests to run on the QuantumSimulator and ResourcesEstimator
+            // add the extracted namespace elements from doc comments to the transformed compilation
 
-            static bool InTestNamespace(QsCallable c) => c.FullName.Namespace.Value == TestNamespaceName;
+            var toBeAdded = built.BuiltCompilation.Namespaces.ToImmutableDictionary(
+                ns => ns.Name,
+                ns => FilterBySourceFile.Apply(ns, IsGeneratedSourceFile));
+            var namespaces = compilation.Namespaces.Select(ns =>
+                toBeAdded.TryGetValue(ns.Name, out var add)
+                ? new QsNamespace(ns.Name, ns.Elements.AddRange(add.Elements), ns.Documentation)
+                : ns);
+            var addedNamespaces = toBeAdded.Values.Where(add => !compilation.Namespaces.Any(ns => ns.Name.Value == add.Name.Value));
+            transformed = new QsCompilation(namespaces.Concat(addedNamespaces).ToImmutableArray(), compilation.EntryPoints);
+
+            // mark all newly created callables as unit tests to run on the QuantumSimulator and ResourcesEstimator
+
+            bool IsGeneratedTest(QsCallable c) => IsGeneratedSourceFile(c.SourceFile);
             var qsimAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.QuantumSimulator));
             var restAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.ResourcesEstimator));
-            transformed = new QsCompilation(compilation.Namespaces.Add(testNs), compilation.EntryPoints);
-            transformed = Attributes.AddToCallables(transformed, (qsimAtt, InTestNamespace), (restAtt, InTestNamespace));
+            transformed = Attributes.AddToCallables(transformed, (qsimAtt, IsGeneratedTest), (restAtt, IsGeneratedTest));
             return true;
         }
-
 
         public bool PostconditionVerification(QsCompilation compilation) =>
             throw new NotImplementedException();
