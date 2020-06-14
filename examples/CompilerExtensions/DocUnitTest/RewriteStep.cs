@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using Kaiser.Quantum.QsCompiler.Transformations;
 using Microsoft.CodeAnalysis;
 using Microsoft.Quantum.QsCompiler;
 using Microsoft.Quantum.QsCompiler.CompilationBuilder;
@@ -77,6 +78,7 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
             // Todo: we need to mark all elements in the newly created namespace with a suitable test attribute
 
             transformed = new QsCompilation(compilation.Namespaces.Add(testNs), compilation.EntryPoints);
+            transformed = TestAttribute.AddToCallables(transformed, c => c.SourceFile.Value == fileManager.FileName.Value);
             return true;
         }
 

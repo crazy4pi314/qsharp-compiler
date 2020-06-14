@@ -10,5 +10,9 @@
     <ProjectReference Include="..\CustomExtension\CustomExtension.csproj" IsQscReference="true" Priority="0" />
     <ProjectReference Include="..\DocUnitTest\DocUnitTest.csproj" IsQscReference="true" Priority="1" />
   </ItemGroup>
- 
+
+  <ItemGroup>
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
+  </ItemGroup>
+
 </Project>

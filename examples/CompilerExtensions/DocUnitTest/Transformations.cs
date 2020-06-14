@@ -3,31 +3,38 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using Microsoft.Quantum.QsCompiler;
 using Microsoft.Quantum.QsCompiler.DataTypes;
 using Microsoft.Quantum.QsCompiler.Documentation;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
 using Core = Microsoft.Quantum.QsCompiler.Transformations.Core;
+using BuiltIn = Microsoft.Quantum.QsCompiler.BuiltIn;
 
 
-namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
+namespace Kaiser.Quantum.QsCompiler.Transformations
 {
-    internal class ExamplesInDocs 
+    using CallablePredicate = Func<QsCallable, bool>;
+    using AttributeId = QsNullable<UserDefinedType>;
+    using QsRangeInfo = QsNullable<Tuple<QsPositionInfo, QsPositionInfo>>;
+
+
+    public class ExamplesInDocs 
     : Core.SyntaxTreeTransformation<List<string>>
     {
-        public ExamplesInDocs() 
+        public static List<string> Extract(QsCompilation compilation)
+        {
+            var instance = new ExamplesInDocs();
+            instance.Apply(compilation);
+            return instance.SharedState;
+        }
+
+        private ExamplesInDocs() 
         : base(new List<string>(), Core.TransformationOptions.NoRebuild)
         {
             this.Namespaces = new NamespaceTransformation(this);
             this.Statements = new Core.StatementTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
             this.Expressions = new Core.ExpressionTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
             this.Types = new Core.TypeTransformation<List<string>>(this, Core.TransformationOptions.Disabled);
-        }
-
-        public static List<string> Extract(QsCompilation compilation)
-        {
-            var instance = new ExamplesInDocs();
-            instance.Apply(compilation);
-            return instance.SharedState;
         }
 
         private class NamespaceTransformation 
@@ -56,13 +63,54 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         }
     }
 
-    internal class DllToQs 
+    public class TestAttribute
+    : Core.SyntaxTreeTransformation<CallablePredicate>
+    {
+        private static readonly AttributeId TypeId =
+            AttributeId.NewValue(new UserDefinedType(BuiltIn.Test.FullName.Namespace, BuiltIn.Test.FullName.Name, QsRangeInfo.Null));
+
+        private static TypedExpression Argument(string target) =>
+            SyntaxGenerator.StringLiteral(NonNullable<string>.New(target), ImmutableArray<TypedExpression>.Empty);
+
+        public static QsCompilation AddToCallables(
+            QsCompilation compilation, // AttributeId attributeId, TypedExpression attributeArg,
+            CallablePredicate predicate = null) =>
+                new TestAttribute(predicate).Apply(compilation);
+
+        private TestAttribute(CallablePredicate predicate = null)
+        : base(predicate)
+        {
+            this.Namespaces = new NamespaceTransformation(this);
+            this.Statements = new Core.StatementTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
+            this.Expressions = new Core.ExpressionTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
+            this.Types = new Core.TypeTransformation<CallablePredicate>(this, Core.TransformationOptions.Disabled);
+        }
+
+        private class NamespaceTransformation
+        : Core.NamespaceTransformation<CallablePredicate>
+        {
+            public NamespaceTransformation(TestAttribute parent)
+            : base(parent)
+            { }
+
+            public override QsCallable OnCallableDeclaration(QsCallable c)
+            {
+                if (!SharedState?.Invoke(c) ?? false) return c;
+                var qsimAtt = new QsDeclarationAttribute(TypeId, Argument("QuantumSimulator"), null, QsComments.Empty); // FIXME: null
+                var rsimAtt = new QsDeclarationAttribute(TypeId, Argument("ResourcesEstimator"), null, QsComments.Empty); // FIXME: null
+                return c.AddAttribute(qsimAtt).AddAttribute(rsimAtt);
+            }
+        }
+    }
+
+    public class DllToQs 
     : Core.SyntaxTreeTransformation
     {
         private static readonly DllToQs Instance = new DllToQs();
-        public static QsCompilation Rename(QsCompilation compilation) => Instance.Apply(compilation);
+        public static QsCompilation Rename(QsCompilation compilation) => 
+            Instance.Apply(compilation);
 
-        internal DllToQs() 
+        private DllToQs() 
         : base()
         {
             this.Namespaces = new NamespaceTransformation(this);
