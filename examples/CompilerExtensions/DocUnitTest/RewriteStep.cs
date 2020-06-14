@@ -9,6 +9,7 @@ using Microsoft.Quantum.QsCompiler;
 using Microsoft.Quantum.QsCompiler.CompilationBuilder;
 using Microsoft.Quantum.QsCompiler.DataTypes;
 using Microsoft.Quantum.QsCompiler.SyntaxTree;
+using Microsoft.Quantum.QsCompiler.Transformations;
 using Microsoft.Quantum.QsCompiler.Transformations.BasicTransformations;
 using VS = Microsoft.VisualStudio.LanguageServer.Protocol;
 using Constants = Microsoft.Quantum.QsCompiler.ReservedKeywords.AssemblyConstants;
