@@ -39,17 +39,17 @@ namespace Kaiser.Quantum.QsCompiler.Transformations
 
             public override ImmutableArray<string> OnDocumentation(ImmutableArray<string> doc)
             {
-                var docComment = new DocComment(doc);
-                IEnumerable<string> examples = docComment.Example.Split('\r', '\n', StringSplitOptions.RemoveEmptyEntries);
-                while (examples.Any())
+                var example = new DocComment(doc).Example; 
+                while (example.Any())
                 {
-                    var lines = examples
-                        .SkipWhile(line => !line.Trim().StartsWith("```"))
-                        .Skip(1)
-                        .TakeWhile(line => !line.Trim().StartsWith("```"))
-                        .ToArray();
-                    examples = examples.Skip(lines.Length + 1);
-                    this.SharedState.Add(String.Join(Environment.NewLine, lines));
+                    example = String.Concat(example
+                        .Substring(example.IndexOf("```") + 3)
+                        .SkipWhile(c => !Char.IsWhiteSpace(c)));
+                    var next = example.IndexOf("```");
+                    this.SharedState.Add(example.Substring(0, next));
+                    example = String.Concat(example
+                        .Substring(next + 3)
+                        .SkipWhile(c => !Char.IsWhiteSpace(c)));
                 }
                 return doc;
             }

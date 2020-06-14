@@ -23,11 +23,33 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         private const string CodeSource = "__GeneratedSourceForDocsToTests__.g.qs";
         private const string ReferenceSource = "__GeneratedReferencesForDocsToTests__.g.dll";
 
+        private static readonly IEnumerable<string> OpenedForTesting = new[] {
+            BuiltIn.CoreNamespace.Value,
+            BuiltIn.IntrinsicNamespace.Value,
+            BuiltIn.DiagnosticsNamespace.Value,
+            BuiltIn.CanonNamespace.Value,
+            BuiltIn.StandardArrayNamespace.Value
+        }.ToImmutableArray();
+
         private readonly List<IRewriteStep.Diagnostic> Diagnostics =
             new List<IRewriteStep.Diagnostic>();
 
         private static readonly FilterBySourceFile FilterSourceFiles = 
             new FilterBySourceFile(source => source.Value.EndsWith(".qs"));
+
+        private static bool ContainsNamespace(QsCompilation compilation, string nsName) =>
+            compilation.Namespaces.Any(ns => ns.Name.Value == nsName);
+
+        private string WrapInTestNamespace(IEnumerable<string> examples, QsCompilation compilation)
+        {
+            var (pre, post) = ($"namespace {TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
+            var openDirs = OpenedForTesting
+                .Where(nsName => ContainsNamespace(compilation, nsName))
+                .Select(nsName => $"open {nsName};");            
+            var content = String.Join(Environment.NewLine, openDirs.Concat(examples));
+            var sourceCode = pre + content + post + Environment.NewLine;
+            return sourceCode;
+        }
 
         // interface properties
 
@@ -47,15 +69,13 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         public bool Transformation(QsCompilation compilation, out QsCompilation transformed)
         {
             transformed = FilterSourceFiles.Apply(compilation);
-            if (compilation.Namespaces.Any(ns => ns.Name.Value == TestNamespaceName)) return false;
+            if (ContainsNamespace(compilation, TestNamespaceName)) return false;
             var manager = new CompilationUnitManager();
 
             // get source code from examples
 
             var examples = ExamplesInDocs.Extract(transformed).Where(ex => !String.IsNullOrWhiteSpace(ex));
-            var (pre, post) = ($"namespace {TestNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
-            var sourceCode = pre + String.Join(Environment.NewLine, examples) + post + Environment.NewLine;
-
+            var sourceCode = WrapInTestNamespace(examples, compilation);
             var sourceName = NonNullable<string>.New(Path.GetFullPath(CodeSource));
             if (!CompilationUnitManager.TryGetUri(sourceName, out var sourceUri)) return false;
             var fileManager = CompilationUnitManager.InitializeFileManager(sourceUri, sourceCode);
