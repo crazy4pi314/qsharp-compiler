@@ -43,14 +43,14 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
         private FileContentManager InitializeFileManager(IEnumerable<string> examples, QsCompilation compilation, string nsName = null)
         {
             var (pre, post) = ($"namespace {nsName ?? DefaultNamespaceName}{{ {Environment.NewLine}", $"{Environment.NewLine}}}");
-            var openDirs = OpenedForTesting
+            var openDirs = String.Join(Environment.NewLine, 
+                OpenedForTesting
                 .Where(nsName => ContainsNamespace(compilation, nsName))
-                .Select(nsName => $"open {nsName};");
+                .Select(nsName => $"open {nsName};"));
 
-            // Todo: To make open directives in examples work we would need to wrap each in its own namespace
+            string WrapInNamespace(string example) => pre + openDirs + example + post;
             examples = examples.Where(ex => !String.IsNullOrWhiteSpace(ex));
-            var content = String.Join(Environment.NewLine, openDirs.Concat(examples));
-            var sourceCode = pre + content + post + Environment.NewLine;
+            var sourceCode = String.Join(Environment.NewLine, examples.Select(WrapInNamespace));
 
             var sourceName = NonNullable<string>.New(Path.GetFullPath($"{nsName}{CodeSource}"));
             return CompilationUnitManager.TryGetUri(sourceName, out var sourceUri)
