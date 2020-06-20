@@ -47,6 +47,7 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
                 .Where(nsName => ContainsNamespace(compilation, nsName))
                 .Select(nsName => $"open {nsName};");
 
+            // Todo: To make open directives in examples work we would need to wrap each in its own namespace
             examples = examples.Where(ex => !String.IsNullOrWhiteSpace(ex));
             var content = String.Join(Environment.NewLine, openDirs.Concat(examples));
             var sourceCode = pre + content + post + Environment.NewLine;
@@ -115,6 +116,7 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
 
             // mark all newly created callables as unit tests to run on the QuantumSimulator and ResourcesEstimator
 
+            // TODO: Check if the callable takes unit as argument and only add the attributes in that case
             bool IsGeneratedTest(QsCallable c) => IsGeneratedSourceFile(c.SourceFile);
             var qsimAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.QuantumSimulator));
             var restAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.ResourcesEstimator));
