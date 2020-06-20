@@ -5,7 +5,7 @@
     ///
     /// # Example
     /// ```qsharp
-    /// function TestIncrement1 () : Unit {
+    /// function TestIncrementAny () : Unit {
     ///     let output = Increment(1);
     ///     EqualityFactI(2, output, "wrong return value");
     /// }
