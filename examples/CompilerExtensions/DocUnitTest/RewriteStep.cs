@@ -117,9 +117,9 @@ namespace Kaiser.Quantum.QsCompiler.Extensions.DocsToTests
             // mark all newly created callables that take unit as argument as unit tests to run on the QuantumSimulator and ResourcesEstimator
 
             bool IsSuitableForUnitTest(QsCallable c) => IsGeneratedSourceFile(c.SourceFile) && c.Signature.ArgumentType.Resolution.IsUnitType;
-            var qsimAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.QuantumSimulator));
-            var restAtt = Attributes.BuildAttribute(BuiltIn.Test.FullName, Attributes.StringArgument(Constants.ResourcesEstimator));
-            transformed = Attributes.AddToCallables(transformed, (qsimAtt, IsSuitableForUnitTest), (restAtt, IsSuitableForUnitTest));
+            var qsimAtt = AttributeUtils.BuildAttribute(BuiltIn.Test.FullName, AttributeUtils.StringArgument(Constants.QuantumSimulator));
+            var restAtt = AttributeUtils.BuildAttribute(BuiltIn.Test.FullName, AttributeUtils.StringArgument(Constants.ResourcesEstimator));
+            transformed = AttributeUtils.AddToCallables(transformed, (qsimAtt, IsSuitableForUnitTest), (restAtt, IsSuitableForUnitTest));
             return true;
         }
 
