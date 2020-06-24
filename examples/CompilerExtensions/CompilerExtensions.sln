@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Demo", "Demo\Demo.csproj", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomExtension", "CustomExtension\CustomExtension.csproj", "{3AB91EBB-F33B-4DB8-B11C-AD78E4DCA235}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DocUnitTest", "DocUnitTest\DocUnitTest.csproj", "{DD8DB9F3-D31D-4CFB-969A-244DA9C1A87E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomExtension.Package", "ExtensionPackage\CustomExtension.Package.csproj", "{AAFBDEA6-87EA-4FD7-AECD-41A5C5FF4289}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{3AB91EBB-F33B-4DB8-B11C-AD78E4DCA235}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3AB91EBB-F33B-4DB8-B11C-AD78E4DCA235}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3AB91EBB-F33B-4DB8-B11C-AD78E4DCA235}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DD8DB9F3-D31D-4CFB-969A-244DA9C1A87E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DD8DB9F3-D31D-4CFB-969A-244DA9C1A87E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DD8DB9F3-D31D-4CFB-969A-244DA9C1A87E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DD8DB9F3-D31D-4CFB-969A-244DA9C1A87E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AAFBDEA6-87EA-4FD7-AECD-41A5C5FF4289}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AAFBDEA6-87EA-4FD7-AECD-41A5C5FF4289}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AAFBDEA6-87EA-4FD7-AECD-41A5C5FF4289}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AAFBDEA6-87EA-4FD7-AECD-41A5C5FF4289}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
